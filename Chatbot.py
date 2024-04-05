@@ -1,29 +1,45 @@
 from openai import OpenAI
 import streamlit as st
 
+def process_stream(stream):
+    for stream_element in stream:
+        if stream_element.event == 'thread.message.delta':
+            yield stream_element.data.delta.content[0].text.value
+        else:
+            yield ''
+
 with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    "[Get an OpenAI API key](https://platform.openai.com/account/api-keys)"
-    "[View the source code](https://github.com/streamlit/llm-examples/blob/main/Chatbot.py)"
-    "[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/streamlit/llm-examples?quickstart=1)"
+    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
+    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
 
-st.title("💬 Chatbot")
-st.caption("🚀 A streamlit chatbot powered by OpenAI LLM")
+st.title("💬 Anschreiben Assistant")
+st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben für dich")
+message = st.chat_message("assistant")
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hallo, möchten Sie, dass ich Ihnen helfe, das perfekte Anschreiben für Sie zu verfassen?"}]
 
+avatars = {'assistant': '🧙‍♀️', 'user': '👤'}
 for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+    st.chat_message(msg["role"], avatar=avatars[msg["role"]]).write(msg["content"])
 
-if prompt := st.chat_input():
+if prompt := st.chat_input(placeholder='Ihre Nachricht'):
     if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
+        st.info("Bitte fügen Sie Ihren OpenAI-API-Schlüssel hinzu, um fortzufahren.")
         st.stop()
 
     client = OpenAI(api_key=openai_api_key)
+    thread = client.beta.threads.create()
+    message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=prompt
+    )
     st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    response = client.chat.completions.create(model="gpt-3.5-turbo", messages=st.session_state.messages)
-    msg = response.choices[0].message.content
+    st.chat_message("user", avatar=avatars['user']).write(prompt)
+    with st.chat_message("assistant", avatar=avatars['assistant']):
+        with client.beta.threads.runs.stream(
+        thread_id=thread.id,
+        assistant_id='asst_WxG5MfdQBpkaZ7kzT5iuYoWp'
+        ) as stream:
+            msg = st.write_stream(process_stream(stream))
     st.session_state.messages.append({"role": "assistant", "content": msg})
-    st.chat_message("assistant").write(msg)
