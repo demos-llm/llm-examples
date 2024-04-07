@@ -21,7 +21,6 @@ with st.sidebar:
 
 st.title("💬 Anschreiben Assistant")
 st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben für dich")
-st.secrets["connections.gsheets"]["spreadsheet"]
 
 # Print results.
 for i, row in enumerate(df.itertuples()):
