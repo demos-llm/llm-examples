@@ -4,6 +4,7 @@ from streamlit_gsheets import GSheetsConnection
 import logging
 import uuid
 from datetime import datetime
+from streamlit_extras.bottom_container import bottom
 
 def check_if_date_string_is_valid(date_string, check_valid_to=True):
     if not isinstance(date_string, str):
@@ -51,10 +52,11 @@ st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben 
 
 c1 = st.container()
 c2 = st.container()
-c3 = st.container()
-c4 = st.container()
+with bottom():
+    c3 = st.container()
+    c4 = st.container()
 
-if c4.button('Zurücksetzen – klicken Sie hier nur, wenn Sie von vorne beginnen möchten', type='primary'):
+if c4.button('Zurücksetzen – klicken Sie hier nur, wenn Sie von vorne beginnen möchten'):
     # Delete all the items in Session state
     for key in st.session_state.keys():
         del st.session_state[key]
