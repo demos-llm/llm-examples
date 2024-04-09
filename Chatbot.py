@@ -33,10 +33,10 @@ for i, row in enumerate(_df.itertuples()):
     if isinstance(row.token, str) and len(row.token):
         st.session_state['tokens'][row.token] = (row.name, row.valid_from, row.valid_to, row.comments)
 
-def process_stream(stream, placeholder):
+def process_stream(stream):
     for stream_element in stream:
         if stream_element.event == 'thread.message.delta':
-            placeholder.write('🧙‍♀️: Schreibt dir...')
+            # placeholder.write('🧙‍♀️: Schreibt dir...')
             yield stream_element.data.delta.content[0].text.value
         else:
             yield ''
@@ -59,7 +59,7 @@ st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben 
 
 c1 = st.container()
 c2 = st.container()
-placeholder = c2.empty()
+# placeholder = c2.empty()
 with bottom():
     c3 = st.container()
     c4 = st.container()
@@ -96,7 +96,7 @@ for uploaded_file in uploaded_files:
 if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
     if not token:
         c1.info("Bitte geben Sie Ihren Token in das Feld links ein, um fortzufahren.")
-        ctoken.info('Bitte geben Sie Ihren Token in das Feld links ein, um fortzufahren.')
+        ctoken.info('Bitte geben Sie Ihren Token in das Feld ein, um fortzufahren.')
         st.stop()
     if token not in st.session_state["tokens"]:
         c1.info("Token unbekannt")
@@ -130,7 +130,7 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
             #logging.debug(f'processing {key} ({st.session_state["uploaded_files_status"][key]})')
             if st.session_state["uploaded_files_status"][key] == False:
 
-                placeholder.write('🧙‍♀️: Ich analysiere den Inhalt der hochgeladenen Dateien...')
+                # placeholder.write('🧙‍♀️: Ich analysiere den Inhalt der hochgeladenen Dateien...')
                 try:
                     file_response = client.files.create(
                         file=st.session_state["uploaded_files"][key],
@@ -158,17 +158,18 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
     )
     #logging.debug(f'final message: {str(message)}')
     st.session_state.messages.append({"role": "user", "content": prompt})
-    placeholder.write('🧙‍♀️: Ich bereite eine Antwort vor...')
+    # placeholder.write('🧙‍♀️: Ich bereite eine Antwort vor...')
     with c1.chat_message("assistant", avatar=avatars['assistant']):
         try:
             with client.beta.threads.runs.stream(
             thread_id=thread_id,
             assistant_id=st.secrets['assistant_id']
             ) as stream:
-                msg = st.write_stream(process_stream(stream, placeholder))
+                msg = st.write_stream(process_stream(stream))
+                # msg = st.write_stream(process_stream(stream, placeholder))
             st.session_state.messages.append({"role": "assistant", "content": msg})
         except NotFoundError as e:
             c2.error(f' {e.message} - Most likely you provided a wrong openai api key', icon="🚨")
             st.write(f' 🚨 Error - Most likely you provided a wrong openai api key')
     #logging.debug(f'list messages from session: {str(st.session_state.messages)}')
-    placeholder.empty()
+    # placeholder.empty()
