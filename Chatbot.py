@@ -25,25 +25,32 @@ def check_if_date_string_is_valid(date_string, check_valid_to=True):
     return True
 
 # Create a connection object.
-conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read()
+_conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
+_df = _conn.read(ttl=0)
 
-# Print results.
-if 'tokens' not in st.session_state:
-    st.session_state['tokens'] = {}
-for i, row in enumerate(df.itertuples()):
+st.session_state['tokens'] = {}
+for i, row in enumerate(_df.itertuples()):
     if isinstance(row.token, str) and len(row.token):
         st.session_state['tokens'][row.token] = (row.name, row.valid_from, row.valid_to, row.comments)
 
-def process_stream(stream):
+def process_stream(stream, placeholder):
     for stream_element in stream:
         if stream_element.event == 'thread.message.delta':
+            placeholder.write('🧙‍♀️: Schreibt dir...')
             yield stream_element.data.delta.content[0].text.value
         else:
             yield ''
 
 with st.sidebar:
     token = st.text_input("Token", key="chatbot_token", type="password")
+    ctoken = st.empty()
+    if len(token):
+        if token not in st.session_state["tokens"]:
+            ctoken.info('Token unbekannt')
+        else:
+            ctoken.info('Erfolg!')
+    else:
+        ctoken.empty()
 #    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
 #    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
 
@@ -52,6 +59,7 @@ st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben 
 
 c1 = st.container()
 c2 = st.container()
+placeholder = c2.empty()
 with bottom():
     c3 = st.container()
     c4 = st.container()
@@ -87,24 +95,27 @@ for uploaded_file in uploaded_files:
 
 if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
     if not token:
-        c1.info("Bitte fügen Sie Ihren Token hinzu, um fortzufahren.")
+        c1.info("Bitte geben Sie Ihren Token in das Feld links ein, um fortzufahren.")
+        ctoken.info('Bitte geben Sie Ihren Token in das Feld links ein, um fortzufahren.')
         st.stop()
     if token not in st.session_state["tokens"]:
         c1.info("Token unbekannt")
+        ctoken.info('Token unbekannt')
         st.stop()
     name, valid_from, valid_to, comments = st.session_state["tokens"][token]
     if not check_if_date_string_is_valid(valid_from, check_valid_to=False) or not check_if_date_string_is_valid(valid_to, check_valid_to=True):
         c1.info('Token an diesem Datum ungültig')
+        ctoken.info('Token an diesem Datum ungültig')
         st.stop()
+    ctoken.info('Erfolg!')
     c1.chat_message("user", avatar=avatars['user']).write(prompt)
-    
     client = OpenAI(api_key=st.secrets['openai_api_key'])
     thread_id = None
     if "thread" not in st.session_state:
         thread = client.beta.threads.create()
         thread_id = thread.id
         st.session_state["thread"] = thread_id
-        logging.debug(f'thread: {thread_id}')
+        #logging.debug(f'thread: {thread_id}')
     else:
         thread_id = st.session_state["thread"]
     for msg in st.session_state.messages:
@@ -113,17 +124,19 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
             role=msg["role"],
             content=msg["content"]
         )
-        logging.debug(f'queue messages: {str(message)}')
+        #logging.debug(f'queue messages: {str(message)}')
     if "uploaded_files" in st.session_state:
         for key in st.session_state["uploaded_files"]:
-            logging.debug(f'processing {key} ({st.session_state["uploaded_files_status"][key]})')
+            #logging.debug(f'processing {key} ({st.session_state["uploaded_files_status"][key]})')
             if st.session_state["uploaded_files_status"][key] == False:
+
+                placeholder.write('🧙‍♀️: Ich analysiere den Inhalt der hochgeladenen Dateien...')
                 try:
                     file_response = client.files.create(
                         file=st.session_state["uploaded_files"][key],
                         purpose="assistants"
                     )
-                    logging.debug(f'file response: {str(file_response)}')
+                    #logging.debug(f'file response: {str(file_response)}')
                     st.session_state["uploaded_files_status"][key] = True
                     if "file_ids" not in st.session_state:
                         st.session_state["file_ids"] = []
@@ -137,23 +150,25 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
                 content="Hier habe ich einige für den Prozess relevante Dokumente wie Lebenslauf, Stellenanzeige oder anderen Kontext hochgeladen – bitte finden Sie heraus, was diese Dateien darstellen.",
                 file_ids = st.session_state["file_ids"][-10:]  # just last 10 due to openai limits
             )
-            logging.debug(f'files message: {str(message)}')
+            #logging.debug(f'files message: {str(message)}')
     message = client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
         content=prompt
     )
-    logging.debug(f'final message: {str(message)}')
+    #logging.debug(f'final message: {str(message)}')
     st.session_state.messages.append({"role": "user", "content": prompt})
+    placeholder.write('🧙‍♀️: Ich bereite eine Antwort vor...')
     with c1.chat_message("assistant", avatar=avatars['assistant']):
         try:
             with client.beta.threads.runs.stream(
             thread_id=thread_id,
-            assistant_id='asst_WxG5MfdQBpkaZ7kzT5iuYoWp'
+            assistant_id=st.secrets['assistant_id']
             ) as stream:
-                msg = st.write_stream(process_stream(stream))
+                msg = st.write_stream(process_stream(stream, placeholder))
             st.session_state.messages.append({"role": "assistant", "content": msg})
         except NotFoundError as e:
             c2.error(f' {e.message} - Most likely you provided a wrong openai api key', icon="🚨")
             st.write(f' 🚨 Error - Most likely you provided a wrong openai api key')
-    logging.debug(f'list messages from session: {str(st.session_state.messages)}')
+    #logging.debug(f'list messages from session: {str(st.session_state.messages)}')
+    placeholder.empty()
