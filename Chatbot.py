@@ -50,7 +50,8 @@ with st.sidebar:
         else:
             ctoken.info('Erfolg!')
     else:
-        ctoken.empty()
+        ctoken.info('Bitte geben Sie Ihren Token in das Feld ein, um fortzufahren.')
+        
 #    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
 #    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
 
