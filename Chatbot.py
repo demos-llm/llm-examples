@@ -1,5 +1,6 @@
 from openai import OpenAI, NotFoundError
 import streamlit as st
+from io import BytesIO
 from streamlit_gsheets import GSheetsConnection
 import logging
 import uuid
@@ -91,7 +92,9 @@ for uploaded_file in uploaded_files:
         st.session_state['uploaded_files_status'] = {}
     if filename not in st.session_state['uploaded_files']:
         bytes_data = uploaded_file.getvalue()
-        st.session_state['uploaded_files'][filename] = bytes_data
+        file_like_object = BytesIO(bytes_data)
+        file_like_object.name = filename
+        st.session_state['uploaded_files'][filename] = file_like_object
         st.session_state['uploaded_files_status'][filename] = False 
 
 if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
@@ -149,7 +152,12 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
                 thread_id=thread_id,
                 role="user",
                 content="Hier habe ich einige für den Prozess relevante Dokumente wie Lebenslauf, Stellenanzeige oder anderen Kontext hochgeladen – bitte finden Sie heraus, was diese Dateien darstellen.",
-                file_ids = st.session_state["file_ids"][-10:]  # just last 10 due to openai limits
+                attachments=[
+                    {
+                        "file_id": message_file_id,
+                        "tools": [{"type": "file_search"}]
+                    } for message_file_id in st.session_state["file_ids"][-20:] # just last 20 due to openai limits
+                ]
             )
             #logging.debug(f'files message: {str(message)}')
     message = client.beta.threads.messages.create(
