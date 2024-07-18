@@ -43,21 +43,21 @@ def process_stream(stream):
             yield ''
 
 with st.sidebar:
-    token = st.text_input("Token", key="chatbot_token", type="password")
+    token = st.text_input("Passwort", key="chatbot_token", type="password")
     ctoken = st.empty()
     if len(token):
         if token not in st.session_state["tokens"]:
-            ctoken.info('Token unbekannt')
+            ctoken.info('Passwort unbekannt')
         else:
             ctoken.info('Erfolg!')
     else:
-        ctoken.info('Bitte geben Sie Ihren Token in das Feld ein, um fortzufahren.')
+        ctoken.info('Bitte geben Sie Ihren Passwort in das Feld ein, um fortzufahren.')
         
 #    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
 #    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
 
-st.title("💬 Anschreiben Assistant")
-st.caption("🖋️ Der Anschreiben Assistant generiert ein ideales Anschreiben für dich")
+st.title("💬 Anschreiben Assistent")
+st.caption("🖋️ Der Anschreiben Assistent generiert ein ideales Anschreiben für dich")
 
 c1 = st.container()
 c2 = st.container()
@@ -99,17 +99,17 @@ for uploaded_file in uploaded_files:
 
 if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
     if not token:
-        c1.info("Bitte geben Sie Ihren Token in das Feld links ein, um fortzufahren.")
-        ctoken.info('Bitte geben Sie Ihren Token in das Feld ein, um fortzufahren.')
+        c1.info("Bitte geben Sie Ihren Passwort in das Feld links ein, um fortzufahren.")
+        ctoken.info('Bitte geben Sie Ihren Passwort in das Feld ein, um fortzufahren.')
         st.stop()
     if token not in st.session_state["tokens"]:
-        c1.info("Token unbekannt")
-        ctoken.info('Token unbekannt')
+        c1.info("Passwort unbekannt")
+        ctoken.info('Passwort unbekannt')
         st.stop()
     name, valid_from, valid_to, comments = st.session_state["tokens"][token]
     if not check_if_date_string_is_valid(valid_from, check_valid_to=False) or not check_if_date_string_is_valid(valid_to, check_valid_to=True):
-        c1.info('Token an diesem Datum ungültig')
-        ctoken.info('Token an diesem Datum ungültig')
+        c1.info('Passwort an diesem Datum ungültig')
+        ctoken.info('Passwort an diesem Datum ungültig')
         st.stop()
     ctoken.info('Erfolg!')
     c1.chat_message("user", avatar=avatars['user']).write(prompt)
