@@ -56,8 +56,8 @@ with st.sidebar:
 #    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
 #    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
 
-st.title("💬 Anschreiben Assistent")
-st.caption("🖋️ Der Anschreiben Assistent generiert ein ideales Anschreiben für dich")
+st.title("💬 Regulation Assistant")
+st.caption("🖋️ The regulation assistant helps you understand documents and regulations.")
 
 c1 = st.container()
 c2 = st.container()
@@ -66,12 +66,12 @@ with bottom():
     c3 = st.container()
     c4 = st.container()
 
-if c4.button('Zurücksetzen – klicken Sie hier nur, wenn Sie von vorne beginnen möchten'):
+if c4.button('Reset - click here only if you wish to start a new chat'):
     # Delete all the items in Session state
     for key in st.session_state.keys():
         del st.session_state[key]
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "Hallo, möchten Sie, dass ich Ihnen helfe, das perfekte Anschreiben für Sie zu verfassen?"}]
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hey, please help me understand documents and regulations."}]
 
 avatars = {'assistant': '🧙‍♀️', 'user': '👤'}
 for msg in st.session_state.messages:
@@ -81,7 +81,7 @@ if 'file_uploader_key' not in st.session_state:
     st.session_state['file_uploader_key'] = str(uuid.uuid4())
 
 uploaded_files = c3.file_uploader(
-    label="Hier können Sie alle für den Prozess relevanten Dokumente wie Lebenslauf, Stellenausschreibung oder anderen Kontext hochladen",
+    label="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
     accept_multiple_files=True, key=st.session_state['file_uploader_key']
 )
 
@@ -99,8 +99,8 @@ for uploaded_file in uploaded_files:
 
 if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
     if not token:
-        c1.info("Bitte geben Sie Ihren Passwort in das Feld links ein, um fortzufahren.")
-        ctoken.info('Bitte geben Sie Ihren Passwort in das Feld ein, um fortzufahren.')
+        c1.info("Please enter your password in the field to continue.")
+        ctoken.info('Please enter your password in the field to continue.')
         st.stop()
     if token not in st.session_state["tokens"]:
         c1.info("Passwort unbekannt")
@@ -151,7 +151,7 @@ if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
             message = client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
-                content="Hier habe ich einige für den Prozess relevante Dokumente wie Lebenslauf, Stellenanzeige oder anderen Kontext hochgeladen – bitte finden Sie heraus, was diese Dateien darstellen.",
+                content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
                 attachments=[
                     {
                         "file_id": message_file_id,
