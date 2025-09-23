@@ -51,7 +51,7 @@ with st.sidebar:
         else:
             ctoken.info('Erfolg!')
     else:
-        ctoken.info('Bitte geben Sie Ihren Passwort in das Feld ein, um fortzufahren.')
+        ctoken.info('Please enter your password in the field to continue.')
         
 #    openai_api_key = st.text_input("OpenAI-API-Schlüssel", key="chatbot_api_key", type="password")
 #    "[Erhalten Sie einen OpenAI-API-Schlüssel](https://platform.openai.com/account/api-keys)"
@@ -97,7 +97,7 @@ for uploaded_file in uploaded_files:
         st.session_state['uploaded_files'][filename] = file_like_object
         st.session_state['uploaded_files_status'][filename] = False 
 
-if prompt := c2.chat_input(placeholder='Ihre Nachricht'):
+if prompt := c2.chat_input(placeholder='Your message'):
     if not token:
         c1.info("Please enter your password in the field to continue.")
         ctoken.info('Please enter your password in the field to continue.')
