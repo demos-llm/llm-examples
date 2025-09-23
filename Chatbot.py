@@ -43,13 +43,13 @@ def process_stream(stream):
             yield ''
 
 with st.sidebar:
-    token = st.text_input("Passwort", key="chatbot_token", type="password")
+    token = st.text_input("Password", key="chatbot_token", type="password")
     ctoken = st.empty()
     if len(token):
         if token not in st.session_state["tokens"]:
-            ctoken.info('Passwort unbekannt')
+            ctoken.info('Password unknown')
         else:
-            ctoken.info('Erfolg!')
+            ctoken.info('Success!')
     else:
         ctoken.info('Please enter your password in the field to continue.')
         
