@@ -90,25 +90,36 @@ def _build_response_input(messages: list[dict], prompt: str) -> list[dict]:
     return items
 
 
-def _extract_text_from_item(item: dict) -> str:
-    content = item.get("content", [])
+def _get_field(source, key, default=None):
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
+
+
+def _extract_text_from_item(item) -> str:
+    content = _get_field(item, "content", []) or []
     if not isinstance(content, list):
         return ""
-    return "\n".join(
-        block.get("text", "")
-        for block in content
-        if isinstance(block, dict) and block.get("type") == "output_text"
-    )
+    texts = []
+    for block in content:
+        block_type = _get_field(block, "type")
+        if block_type != "output_text":
+            continue
+        text = _get_field(block, "text")
+        if text:
+            texts.append(text)
+    return "\n".join(texts)
 
 
 def _summarize_response_output(output_items: list[dict]) -> list[dict]:
     summaries = []
     for item in output_items:
+        attachments = _get_field(item, "attachments") or []
         summaries.append({
-            "id": item.get("id"),
-            "type": item.get("type"),
-            "role": item.get("role"),
-            "attachments": len(item.get("attachments", [])),
+            "id": _get_field(item, "id"),
+            "type": _get_field(item, "type"),
+            "role": _get_field(item, "role"),
+            "attachments": len(attachments),
             "text": _extract_text_from_item(item),
         })
     return summaries
@@ -119,7 +130,7 @@ def _extract_assistant_text(response) -> str:
         return response.output_text
     output_items = getattr(response, "output", [])
     for item in output_items:
-        if item.get("type") == "message" and item.get("role") == "assistant":
+        if _get_field(item, "type") == "message" and _get_field(item, "role") == "assistant":
             text = _extract_text_from_item(item)
             if text:
                 return text
