@@ -31,6 +31,7 @@ def _ensure_upload_state():
     if "uploaded_files" not in st.session_state:
         st.session_state["uploaded_files"] = {}
         st.session_state["uploaded_files_status"] = {}
+    st.session_state.setdefault("vector_store_ids", [])
 
 
 def register_uploaded_file(uploaded_file) -> bool:
@@ -47,6 +48,7 @@ def register_uploaded_file(uploaded_file) -> bool:
 
 
 def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
+    _ensure_upload_state()
     uploaded_files = st.session_state.get("uploaded_files")
     if not uploaded_files:
         return [], []
@@ -64,6 +66,11 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
             statuses[key] = True
             new_ids.append(file_response.id)
             new_names.append(key)
+            vector_store_id = getattr(file_response, "vector_store_id", None)
+            if vector_store_id:
+                vector_store_list = st.session_state.setdefault("vector_store_ids", [])
+                if vector_store_id not in vector_store_list:
+                    vector_store_list.append(vector_store_id)
         except Exception as exc:
             on_error(key, exc)
     if new_ids:
