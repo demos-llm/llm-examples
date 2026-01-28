@@ -132,7 +132,7 @@ if prompt := c2.chat_input(placeholder='Your message'):
     if "uploaded_files" in st.session_state:
         for key in st.session_state["uploaded_files"]:
             #logging.debug(f'processing {key} ({st.session_state["uploaded_files_status"][key]})')
-            if st.session_state["uploaded_files_status"][key] == False:
+            if not st.session_state["uploaded_files_status"][key]:
 
                 # placeholder.write('🧙‍♀️: Ich analysiere den Inhalt der hochgeladenen Dateien...')
                 try:
@@ -180,6 +180,6 @@ if prompt := c2.chat_input(placeholder='Your message'):
             st.session_state.messages.append({"role": "assistant", "content": msg})
         except NotFoundError as e:
             c2.error(f' {e.message} - Most likely you provided a wrong openai api key', icon="🚨")
-            st.write(f' 🚨 Error - Most likely you provided a wrong openai api key')
+            st.write(' 🚨 Error - Most likely you provided a wrong openai api key')
     #logging.debug(f'list messages from session: {str(st.session_state.messages)}')
     # placeholder.empty()
