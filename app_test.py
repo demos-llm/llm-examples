@@ -153,6 +153,16 @@ def test_upload_pending_files_creates_file_ids(monkeypatch):
     assert result2_names == []
 
 
+def test_upload_pending_files_handles_no_files(monkeypatch):
+    _reset_state(monkeypatch)
+    from Chatbot import upload_pending_files
+
+    client = MagicMock()
+    result_ids, result_names = upload_pending_files(client, lambda name, exc: None)
+    assert result_ids == []
+    assert result_names == []
+
+
 def test_upload_pending_files_reports_errors(monkeypatch):
     st = _reset_state(monkeypatch)
     from Chatbot import register_uploaded_file, upload_pending_files

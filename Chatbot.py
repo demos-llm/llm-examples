@@ -49,7 +49,7 @@ def register_uploaded_file(uploaded_file) -> bool:
 def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
     uploaded_files = st.session_state.get("uploaded_files")
     if not uploaded_files:
-        return []
+        return [], []
     statuses = st.session_state.setdefault("uploaded_files_status", {})
     new_ids = []
     new_names = []
@@ -71,13 +71,18 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
     return new_ids, new_names
 
 # Create a connection object.
-_conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
-_df = _conn.read(ttl=0)
+_df = None
+try:
+    _conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
+    _df = _conn.read(ttl=0)
+except ValueError:
+    logging.warning("Spreadsheet connection could not be initialized; proceeding with empty tokens.")
 
 st.session_state['tokens'] = {}
-for i, row in enumerate(_df.itertuples()):
-    if isinstance(row.token, str) and len(row.token):
-        st.session_state['tokens'][row.token] = (row.name, row.valid_from, row.valid_to, row.comments)
+if _df is not None:
+    for i, row in enumerate(_df.itertuples()):
+        if isinstance(row.token, str) and len(row.token):
+            st.session_state['tokens'][row.token] = (row.name, row.valid_from, row.valid_to, row.comments)
 
 def process_stream(stream):
     for stream_element in stream:
