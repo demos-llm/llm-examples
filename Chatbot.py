@@ -193,11 +193,12 @@ if prompt := c2.chat_input(placeholder='Your message'):
         c1.chat_message('system', avatar=avatars['system']).write(
             f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
         )
+        resp_attachments = []
         try:
             message = client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
-                content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
+                content="Here I have uploaded some documents relevant to the process, such as a text document, or other context – please find out what these files represent.",
                 attachments=attachments
             )
             logging.info("Attachments message response: %s", message)
@@ -206,20 +207,23 @@ if prompt := c2.chat_input(placeholder='Your message'):
                 resp_attachments = message.get("attachments", [])
             else:
                 resp_attachments = getattr(message, "attachments", [])
-            c1.chat_message('system', avatar=avatars['system']).write(
-                f"OpenAI processed attachments (id={resp_id}). Attachments payload: {resp_attachments}."
-                " Check the OpenAI console for “I’m analyzing the uploaded files” or errors."
-            )
+            # c1.chat_message('system', avatar=avatars['system']).write(
+            #    f"OpenAI processed attachments (id={resp_id}). Attachments payload: {resp_attachments}."
+            #    " Check the OpenAI console for “I’m analyzing the uploaded files” or errors."
+            #)
         except Exception as exc:
             logging.error("Failed to send attachment message: %s", exc)
             c1.chat_message('system', avatar=avatars['system']).write(
                 f"Attachment message failed: {exc}. Check OpenAI logs for details."
             )
         #logging.debug(f'files message: {str(message)}')
+    user_prompt = prompt
+    if len(resp_attachments):
+        user_prompt += f" (Attachments payload: {resp_attachments})"
     message = client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
-        content=prompt
+        content=user_prompt
     )
     #logging.debug(f'final message: {str(message)}')
     st.session_state.messages.append({"role": "user", "content": prompt})
