@@ -6,6 +6,7 @@ import logging
 import uuid
 from datetime import datetime
 from streamlit_extras.bottom_container import bottom
+from typing import Callable
 
 def check_if_date_string_is_valid(date_string, check_valid_to=True):
     if not isinstance(date_string, str):
@@ -24,6 +25,50 @@ def check_if_date_string_is_valid(date_string, check_valid_to=True):
         if current_datetime < date_object:
             return False
     return True
+
+
+def _ensure_upload_state():
+    if "uploaded_files" not in st.session_state:
+        st.session_state["uploaded_files"] = {}
+        st.session_state["uploaded_files_status"] = {}
+
+
+def register_uploaded_file(uploaded_file) -> bool:
+    _ensure_upload_state()
+    filename = uploaded_file.name
+    if filename in st.session_state["uploaded_files"]:
+        return False
+    bytes_data = uploaded_file.getvalue()
+    file_like_object = BytesIO(bytes_data)
+    file_like_object.name = filename
+    st.session_state["uploaded_files"][filename] = file_like_object
+    st.session_state["uploaded_files_status"][filename] = False
+    return True
+
+
+def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
+    uploaded_files = st.session_state.get("uploaded_files")
+    if not uploaded_files:
+        return []
+    statuses = st.session_state.setdefault("uploaded_files_status", {})
+    new_ids = []
+    new_names = []
+    for key, file_obj in uploaded_files.items():
+        if statuses.get(key):
+            continue
+        try:
+            file_response = client.files.create(
+                file=file_obj,
+                purpose="assistants"
+            )
+            statuses[key] = True
+            new_ids.append(file_response.id)
+            new_names.append(key)
+        except Exception as exc:
+            on_error(key, exc)
+    if new_ids:
+        st.session_state.setdefault("file_ids", []).extend(new_ids)
+    return new_ids, new_names
 
 # Create a connection object.
 _conn = st.connection("gsheets", type=GSheetsConnection, ttl=0)
@@ -87,15 +132,7 @@ uploaded_files = c3.file_uploader(
 
 for uploaded_file in uploaded_files:
     filename = uploaded_file.name
-    if 'uploaded_files' not in st.session_state:
-        st.session_state['uploaded_files'] = {}
-        st.session_state['uploaded_files_status'] = {}
-    if filename not in st.session_state['uploaded_files']:
-        bytes_data = uploaded_file.getvalue()
-        file_like_object = BytesIO(bytes_data)
-        file_like_object.name = filename
-        st.session_state['uploaded_files'][filename] = file_like_object
-        st.session_state['uploaded_files_status'][filename] = False 
+    register_uploaded_file(uploaded_file)
 
 if prompt := c2.chat_input(placeholder='Your message'):
     if not token:
@@ -129,38 +166,26 @@ if prompt := c2.chat_input(placeholder='Your message'):
             content=msg["content"]
         )
         #logging.debug(f'queue messages: {str(message)}')
-    if "uploaded_files" in st.session_state:
-        for key in st.session_state["uploaded_files"]:
-            #logging.debug(f'processing {key} ({st.session_state["uploaded_files_status"][key]})')
-            if not st.session_state["uploaded_files_status"][key]:
+    def _report_upload_error(filename, exc):
+        logging.error("Failed to upload %s: %s", filename, exc)
+        c1.chat_message('system', avatar=avatars['system']).write(f"Upload error for {filename}: {exc}")
 
-                # placeholder.write('🧙‍♀️: Ich analysiere den Inhalt der hochgeladenen Dateien...')
-                try:
-                    file_response = client.files.create(
-                        file=st.session_state["uploaded_files"][key],
-                        purpose="assistants"
-                    )
-                    #logging.debug(f'file response: {str(file_response)}')
-                    st.session_state["uploaded_files_status"][key] = True
-                    if "file_ids" not in st.session_state:
-                        st.session_state["file_ids"] = []
-                    st.session_state["file_ids"].append(file_response.id)
-                except Exception as exc:
-                    logging.error("Failed to upload %s: %s", key, exc)
-                    c1.chat_message('system', avatar=avatars['system']).write(f"Upload error for {key}: {exc}")
-        if "file_ids" in st.session_state and len(st.session_state["file_ids"]):
-            message = client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
-                attachments=[
-                    {
-                        "file_id": message_file_id,
-                        "tools": [{"type": "file_search"}]
-                    } for message_file_id in st.session_state["file_ids"][-20:] # just last 20 due to openai limits
-                ]
-            )
-            #logging.debug(f'files message: {str(message)}')
+    new_ids, new_names = upload_pending_files(client, _report_upload_error)
+    if new_names:
+        c1.chat_message('system', avatar=avatars['system']).write(f"File uploaded: {', '.join(new_names)}")
+    if "file_ids" in st.session_state and len(st.session_state["file_ids"]):
+        message = client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
+            attachments=[
+                {
+                    "file_id": message_file_id,
+                    "tools": [{"type": "file_search"}]
+                } for message_file_id in st.session_state["file_ids"][-20:] # just last 20 due to openai limits
+            ]
+        )
+        #logging.debug(f'files message: {str(message)}')
     message = client.beta.threads.messages.create(
         thread_id=thread_id,
         role="user",
