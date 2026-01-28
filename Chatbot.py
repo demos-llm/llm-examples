@@ -73,7 +73,7 @@ if c4.button('Reset - click here only if you wish to start a new chat'):
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "Hey, please help me understand documents and regulations."}]
 
-avatars = {'assistant': '🧙‍♀️', 'user': '👤'}
+avatars = {'assistant': '🧙‍♀️', 'user': '👤', 'system': '🖥️'}
 for msg in st.session_state.messages:
     c1.chat_message(msg["role"], avatar=avatars[msg["role"]]).write(msg["content"])
 
@@ -103,15 +103,15 @@ if prompt := c2.chat_input(placeholder='Your message'):
         ctoken.info('Please enter your password in the field to continue.')
         st.stop()
     if token not in st.session_state["tokens"]:
-        c1.info("Passwort unbekannt")
-        ctoken.info('Passwort unbekannt')
+        c1.info("Password incorrect")
+        ctoken.info('Password incorrect')
         st.stop()
     name, valid_from, valid_to, comments = st.session_state["tokens"][token]
     if not check_if_date_string_is_valid(valid_from, check_valid_to=False) or not check_if_date_string_is_valid(valid_to, check_valid_to=True):
-        c1.info('Passwort an diesem Datum ungültig')
-        ctoken.info('Passwort an diesem Datum ungültig')
+        c1.info('Password expired')
+        ctoken.info('Password expired')
         st.stop()
-    ctoken.info('Erfolg!')
+    ctoken.info('Success!')
     c1.chat_message("user", avatar=avatars['user']).write(prompt)
     client = OpenAI(api_key=st.secrets['openai_api_key'])
     thread_id = None
@@ -145,8 +145,9 @@ if prompt := c2.chat_input(placeholder='Your message'):
                     if "file_ids" not in st.session_state:
                         st.session_state["file_ids"] = []
                     st.session_state["file_ids"].append(file_response.id)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logging.error("Failed to upload %s: %s", key, exc)
+                    c1.chat_message('system', avatar=avatars['system']).write(f"Upload error for {key}: {exc}")
         if "file_ids" in st.session_state and len(st.session_state["file_ids"]):
             message = client.beta.threads.messages.create(
                 thread_id=thread_id,
