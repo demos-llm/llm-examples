@@ -189,11 +189,11 @@ if prompt := c2.chat_input(placeholder='Your message'):
     if new_names:
         c1.chat_message('system', avatar=avatars['system']).write(f"File uploaded: {', '.join(new_names)}")
     attachments = build_attachment_payload(st.session_state.get("file_ids", []))
+    resp_attachments = []
     if attachments:
         c1.chat_message('system', avatar=avatars['system']).write(
             f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
         )
-        resp_attachments = []
         try:
             message = client.beta.threads.messages.create(
                 thread_id=thread_id,
