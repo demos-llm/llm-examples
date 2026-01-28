@@ -220,7 +220,7 @@ if prompt := c2.chat_input(placeholder='Your message'):
         message = client.beta.threads.messages.create(
             thread_id=thread_id,
             role="user",
-            content=user_prompt
+            content=prompt
         )
     #logging.debug(f'final message: {str(message)}')
     st.session_state.messages.append({"role": "user", "content": prompt})
