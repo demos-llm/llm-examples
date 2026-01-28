@@ -130,7 +130,6 @@ def call_responses_api(client, prompt_payload, text_input, tools):
     return client.responses.create(
         prompt=prompt_payload,
         input=text_input,
-        include=["output", "output_text"],
         tools=tools or None,
         store=False
     )
