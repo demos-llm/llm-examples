@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from streamlit.testing.v1 import AppTest
 
 TOKEN_DATA = {

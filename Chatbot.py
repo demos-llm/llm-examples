@@ -1,4 +1,4 @@
-from openai import OpenAI, NotFoundError
+from openai import OpenAI
 import streamlit as st
 from io import BytesIO
 from streamlit_gsheets import GSheetsConnection
