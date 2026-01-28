@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from streamlit.testing.v1 import AppTest
 
 TOKEN_DATA = {
@@ -190,3 +190,53 @@ def test_build_attachment_payload_logs_list(monkeypatch, caplog):
     assert len(payload) == 3
     assert payload[0]["file_id"] == "file-1"
     assert "file-3" in caplog.text
+
+
+def test_build_response_input_and_extractors():
+    from Chatbot import _build_response_input, _extract_assistant_text, _extract_text_from_item
+
+    messages = [
+        {"role": "assistant", "content": "Hello"},
+        {"role": "user", "content": "Hi"},
+    ]
+    prompt = "Please analyze"
+    items = _build_response_input(messages, prompt)
+    assert items[-1]["content"] == prompt
+    dummy_response = MagicMock()
+    dummy_item = {
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "output_text", "text": "analysis"}],
+    }
+    dummy_response.output = [dummy_item]
+    dummy_response.output_text = "analysis"
+    assistant_text = _extract_assistant_text(dummy_response)
+    assert assistant_text == "analysis"
+    assert _extract_text_from_item(dummy_item) == "analysis"
+
+
+def test_summarize_response_output():
+    from Chatbot import _summarize_response_output
+
+    items = [
+        {"id": "msg1", "type": "message", "role": "assistant", "attachments": [1], "content": [{"type": "output_text", "text": "hi"}]},
+        {"id": "rs1", "type": "reasoning", "content": []},
+    ]
+    summary = _summarize_response_output(items)
+    assert summary[0]["attachments"] == 1
+    assert summary[0]["text"] == "hi"
+
+
+def test_call_responses_api():
+    from Chatbot import call_responses_api
+
+    client = MagicMock()
+    client.responses.create = MagicMock()
+    prompt_payload = {"id": "pmpt", "version": "1"}
+    text_input = [
+        {"role": "assistant", "content": "Hello"},
+        {"role": "user", "content": "Please analyze"},
+    ]
+    tools = [{"type": "file_search", "vector_store_ids": ["vs1"]}]
+    call_responses_api(client, prompt_payload, text_input, tools)
+    client.responses.create.assert_called_once()

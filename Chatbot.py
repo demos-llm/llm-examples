@@ -80,6 +80,61 @@ def build_attachment_payload(file_ids: Iterable[str]) -> list[dict]:
     logging.info("Built attachment payload for file_ids=%s", ids[-20:])
     return payload
 
+
+def _build_response_input(messages: list[dict], prompt: str) -> list[dict]:
+    items = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in messages
+    ]
+    items.append({"role": "user", "content": prompt})
+    return items
+
+
+def _extract_text_from_item(item: dict) -> str:
+    content = item.get("content", [])
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(
+        block.get("text", "")
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "output_text"
+    )
+
+
+def _summarize_response_output(output_items: list[dict]) -> list[dict]:
+    summaries = []
+    for item in output_items:
+        summaries.append({
+            "id": item.get("id"),
+            "type": item.get("type"),
+            "role": item.get("role"),
+            "attachments": len(item.get("attachments", [])),
+            "text": _extract_text_from_item(item),
+        })
+    return summaries
+
+
+def _extract_assistant_text(response) -> str:
+    if hasattr(response, "output_text") and response.output_text:
+        return response.output_text
+    output_items = getattr(response, "output", [])
+    for item in output_items:
+        if item.get("type") == "message" and item.get("role") == "assistant":
+            text = _extract_text_from_item(item)
+            if text:
+                return text
+    return ""
+
+
+def call_responses_api(client, prompt_payload, text_input, tools):
+    return client.responses.create(
+        prompt=prompt_payload,
+        input=text_input,
+        include=["output", "output_text"],
+        tools=tools or None,
+        store=False
+    )
+
 # Create a connection object.
 _df = None
 try:
@@ -166,21 +221,6 @@ if prompt := c2.chat_input(placeholder='Your message'):
     ctoken.info('Success!')
     c1.chat_message("user", avatar=avatars['user']).write(prompt)
     client = OpenAI(api_key=st.secrets['openai_api_key'])
-    thread_id = None
-    if "thread" not in st.session_state:
-        thread = client.beta.threads.create()
-        thread_id = thread.id
-        st.session_state["thread"] = thread_id
-        #logging.debug(f'thread: {thread_id}')
-    else:
-        thread_id = st.session_state["thread"]
-    for msg in st.session_state.messages:
-        message = client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role=msg["role"],
-            content=msg["content"]
-        )
-        #logging.debug(f'queue messages: {str(message)}')
     def _report_upload_error(filename, exc):
         logging.error("Failed to upload %s: %s", filename, exc)
         c1.chat_message('system', avatar=avatars['system']).write(f"Upload error for {filename}: {exc}")
@@ -189,56 +229,40 @@ if prompt := c2.chat_input(placeholder='Your message'):
     if new_names:
         c1.chat_message('system', avatar=avatars['system']).write(f"File uploaded: {', '.join(new_names)}")
     attachments = build_attachment_payload(st.session_state.get("file_ids", []))
-    resp_attachments = []
     if attachments:
         c1.chat_message('system', avatar=avatars['system']).write(
             f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
         )
-        try:
-            message = client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content="Here I have uploaded some documents relevant to the process, such as a text document, or other context – please find out what these files represent.",
-                attachments=attachments
-            )
-            logging.info("Attachments message response: %s", message)
-            resp_id = getattr(message, "id", None) or message.get("id") if isinstance(message, dict) else None
-            if isinstance(message, dict):
-                resp_attachments = message.get("attachments", [])
-            else:
-                resp_attachments = getattr(message, "attachments", [])
-            # c1.chat_message('system', avatar=avatars['system']).write(
-            #    f"OpenAI processed attachments (id={resp_id}). Attachments payload: {resp_attachments}."
-            #    " Check the OpenAI console for “I’m analyzing the uploaded files” or errors."
-            #)
-        except Exception as exc:
-            logging.error("Failed to send attachment message: %s", exc)
-            c1.chat_message('system', avatar=avatars['system']).write(
-                f"Attachment message failed: {exc}. Check OpenAI logs for details."
-            )
-        #logging.debug(f'files message: {str(message)}')
-    user_prompt = prompt
-    if len(resp_attachments):
-        user_prompt += f" (Attachments payload: {resp_attachments})"
-    message = client.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content=user_prompt
-    )
-    #logging.debug(f'final message: {str(message)}')
+    tools = []
+    if attachments:
+        vector_store_ids = st.secrets.get("vector_store_ids", [])
+        if vector_store_ids:
+            tools.append({
+                "type": "file_search",
+                "vector_store_ids": vector_store_ids,
+            })
+    prompt_payload = {
+        "id": st.secrets.get("prompt_id", "pmpt_6979c830bf4c8197a48f1197b963078108d22efa081cae2a"),
+        "version": (st.secrets.get("prompt_version") or "1"),
+    }
+    user_input = prompt + (f" (Attachments used: {[entry['file_id'] for entry in attachments]})" if attachments else "")
+    response = None
+    try:
+        response = call_responses_api(client, prompt_payload, _build_response_input(st.session_state["messages"], user_input), tools)
+        logging.info("Responses API result: %s", response)
+        output_summary = _summarize_response_output(getattr(response, "output", []))
+        c1.chat_message('system', avatar=avatars['system']).write(
+            f"Response metadata: {output_summary}. Attachment items sent: {[entry['file_id'] for entry in attachments]}"
+        )
+        assistant_text = _extract_assistant_text(response) or ""
+    except Exception as exc:
+        logging.error("Responses.create failed: %s", exc)
+        c1.chat_message('system', avatar=avatars['system']).write(
+            f"Responses API failed: {exc}. Check OpenAI console for more details."
+        )
+        assistant_text = ""
+
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # placeholder.write('🧙‍♀️: Ich bereite eine Antwort vor...')
-    with c1.chat_message("assistant", avatar=avatars['assistant']):
-        try:
-            with client.beta.threads.runs.stream(
-            thread_id=thread_id,
-            assistant_id=st.secrets['assistant_id']
-            ) as stream:
-                msg = st.write_stream(process_stream(stream))
-                # msg = st.write_stream(process_stream(stream, placeholder))
-            st.session_state.messages.append({"role": "assistant", "content": msg})
-        except NotFoundError as e:
-            c2.error(f' {e.message} - Most likely you provided a wrong openai api key', icon="🚨")
-            st.write(' 🚨 Error - Most likely you provided a wrong openai api key')
-    #logging.debug(f'list messages from session: {str(st.session_state.messages)}')
-    # placeholder.empty()
+    if assistant_text:
+        st.session_state.messages.append({"role": "assistant", "content": assistant_text})
+        c1.chat_message("assistant", avatar=avatars['assistant']).write(assistant_text)
