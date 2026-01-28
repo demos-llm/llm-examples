@@ -6,7 +6,7 @@ import logging
 import uuid
 from datetime import datetime
 from streamlit_extras.bottom_container import bottom
-from typing import Callable
+from typing import Callable, Iterable
 
 def check_if_date_string_is_valid(date_string, check_valid_to=True):
     if not isinstance(date_string, str):
@@ -69,6 +69,16 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
     if new_ids:
         st.session_state.setdefault("file_ids", []).extend(new_ids)
     return new_ids, new_names
+
+
+def build_attachment_payload(file_ids: Iterable[str]) -> list[dict]:
+    ids = list(file_ids)
+    payload = [
+        {"file_id": file_id, "tools": [{"type": "file_search"}]}
+        for file_id in ids[-20:]
+    ]
+    logging.info("Built attachment payload for file_ids=%s", ids[-20:])
+    return payload
 
 # Create a connection object.
 _df = None
@@ -178,18 +188,33 @@ if prompt := c2.chat_input(placeholder='Your message'):
     new_ids, new_names = upload_pending_files(client, _report_upload_error)
     if new_names:
         c1.chat_message('system', avatar=avatars['system']).write(f"File uploaded: {', '.join(new_names)}")
-    if "file_ids" in st.session_state and len(st.session_state["file_ids"]):
-        message = client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
-            attachments=[
-                {
-                    "file_id": message_file_id,
-                    "tools": [{"type": "file_search"}]
-                } for message_file_id in st.session_state["file_ids"][-20:] # just last 20 due to openai limits
-            ]
+    attachments = build_attachment_payload(st.session_state.get("file_ids", []))
+    if attachments:
+        c1.chat_message('system', avatar=avatars['system']).write(
+            f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
         )
+        try:
+            message = client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content="Here you can upload all documents relevant to the process, such as your CV, job advertisement or other context.",
+                attachments=attachments
+            )
+            logging.info("Attachments message response: %s", message)
+            resp_id = getattr(message, "id", None) or message.get("id") if isinstance(message, dict) else None
+            if isinstance(message, dict):
+                resp_attachments = message.get("attachments", [])
+            else:
+                resp_attachments = getattr(message, "attachments", [])
+            c1.chat_message('system', avatar=avatars['system']).write(
+                f"OpenAI processed attachments (id={resp_id}). Attachments payload: {resp_attachments}."
+                " Check the OpenAI console for “I’m analyzing the uploaded files” or errors."
+            )
+        except Exception as exc:
+            logging.error("Failed to send attachment message: %s", exc)
+            c1.chat_message('system', avatar=avatars['system']).write(
+                f"Attachment message failed: {exc}. Check OpenAI logs for details."
+            )
         #logging.debug(f'files message: {str(message)}')
     message = client.beta.threads.messages.create(
         thread_id=thread_id,

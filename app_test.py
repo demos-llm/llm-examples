@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import pytest
 from datetime import datetime, timedelta
@@ -179,3 +180,13 @@ def test_upload_pending_files_reports_errors(monkeypatch):
     assert isinstance(errors[0][1], ValueError)
     assert st.session_state["uploaded_files_status"]["error.docx"] is False
     assert st.session_state.get("file_ids", []) == []
+
+
+def test_build_attachment_payload_logs_list(monkeypatch, caplog):
+    from Chatbot import build_attachment_payload
+
+    caplog.set_level(logging.INFO)
+    payload = build_attachment_payload([f"file-{i}" for i in range(1, 4)])
+    assert len(payload) == 3
+    assert payload[0]["file_id"] == "file-1"
+    assert "file-3" in caplog.text
