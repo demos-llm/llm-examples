@@ -63,6 +63,7 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
                 file=file_obj,
                 purpose="assistants"
             )
+            logging.info("Uploaded file %s -> id=%s metadata=%s", key, getattr(file_response, "id", None), file_response)
             statuses[key] = True
             new_ids.append(file_response.id)
             new_names.append(key)
@@ -250,17 +251,19 @@ if prompt := c2.chat_input(placeholder='Your message'):
         c1.chat_message('system', avatar=avatars['system']).write(
             f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
         )
+        logging.info("Preparing to send attachments %s with vector stores %s", [entry['file_id'] for entry in attachments], st.session_state.get("vector_store_ids"))
     tools = []
     if attachments:
-        vector_store_ids = st.secrets.get("vector_store_ids", [])
+        vector_store_ids = st.session_state.get("vector_store_ids") or st.secrets.get("vector_store_ids", [])
         if vector_store_ids:
             tools.append({
                 "type": "file_search",
                 "vector_store_ids": vector_store_ids,
             })
+            logging.info("Passing file_search tool with vector_store_ids=%s", vector_store_ids)
     prompt_payload = {
         "id": st.secrets.get("prompt_id", "pmpt_6979c830bf4c8197a48f1197b963078108d22efa081cae2a"),
-        "version": (st.secrets.get("prompt_version") or "1"),
+        "version": (st.secrets.get("prompt_version") or "2"),
     }
     user_input = prompt + (f" (Attachments used: {[entry['file_id'] for entry in attachments]})" if attachments else "")
     response = None
