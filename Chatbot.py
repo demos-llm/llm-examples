@@ -248,7 +248,7 @@ if c4.button('Reset - click here only if you wish to start a new chat'):
     for key in st.session_state.keys():
         del st.session_state[key]
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "Hey, please help me understand documents and regulations."}]
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hey, would you like me to help you understand documents and regulations?"}]
 
 avatars = {'assistant': '🧙‍♀️', 'user': '👤', 'system': '🖥️'}
 for msg in st.session_state.messages:
