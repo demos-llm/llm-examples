@@ -310,6 +310,8 @@ if prompt := c2.chat_input(placeholder='Your message'):
         "version": (st.secrets.get("prompt_version") or "2"),
     }
     user_input = prompt + (f" (Attachments used: {[entry['file_id'] for entry in attachments]})" if attachments else "")
+    thinking_placeholder = c1.empty()
+    thinking_placeholder.info("I'm thinking and preparing an answer. Please be patient...", icon="⏳")
     response = None
     try:
         response = call_responses_api(client, prompt_payload, _build_response_input(st.session_state["messages"], user_input), tools)
@@ -318,6 +320,7 @@ if prompt := c2.chat_input(placeholder='Your message'):
         logging.debug(
             f"Response metadata: {output_summary}. Attachment items sent: {[entry['file_id'] for entry in attachments]}"
         )
+        thinking_placeholder.empty()
         assistant_text = _extract_assistant_text(response) or ""
     except Exception as exc:
         logging.error("Responses.create failed: %s", exc)
@@ -325,6 +328,7 @@ if prompt := c2.chat_input(placeholder='Your message'):
             f"Responses API failed: {exc}. Check OpenAI console for more details."
         )
         assistant_text = ""
+        thinking_placeholder.empty()
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     if assistant_text:
