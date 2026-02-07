@@ -85,6 +85,7 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
     if new_ids:
         st.session_state.setdefault("file_ids", []).extend(new_ids)
         _add_uploaded_files_context(new_names, new_ids)
+        _ensure_vector_store_for_upload(client, new_ids)
     return new_ids, new_names
 
 
@@ -97,6 +98,29 @@ def _add_uploaded_files_context(new_names: list[str], new_ids: list[str]) -> Non
         "role": "system",
         "content": f"The following documents were uploaded and are now part of the context: {attachments_str}.",
     })
+
+
+def _ensure_vector_store_for_upload(client, file_ids: list[str]) -> None:
+    if not file_ids:
+        return
+    vector_store_ids = st.session_state.setdefault("vector_store_ids", [])
+    if vector_store_ids:
+        return
+    try:
+        vector_store = client.vector_stores.create(
+            name="Regulation Assistant uploads",
+            file_ids=file_ids,
+        )
+        vector_store_id = getattr(vector_store, "id", None)
+        if vector_store_id:
+            vector_store_ids.append(vector_store_id)
+            logging.info(
+                "Created vector store %s for uploaded files %s",
+                vector_store_id,
+                file_ids,
+            )
+    except Exception as exc:
+        logging.error("Failed to create vector store for uploaded files: %s", exc)
 
 
 def build_attachment_payload(file_ids: Iterable[str]) -> list[dict]:
