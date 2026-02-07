@@ -84,7 +84,19 @@ def upload_pending_files(client, on_error: Callable[[str, Exception], None]):
             on_error(key, exc)
     if new_ids:
         st.session_state.setdefault("file_ids", []).extend(new_ids)
+        _add_uploaded_files_context(new_names, new_ids)
     return new_ids, new_names
+
+
+def _add_uploaded_files_context(new_names: list[str], new_ids: list[str]) -> None:
+    if not new_names:
+        return
+    attachments_str = ", ".join(f"{name} ({file_id})" for name, file_id in zip(new_names, new_ids))
+    st.session_state.setdefault("messages", [])
+    st.session_state["messages"].append({
+        "role": "system",
+        "content": f"The following documents were uploaded and are now part of the context: {attachments_str}.",
+    })
 
 
 def build_attachment_payload(file_ids: Iterable[str]) -> list[dict]:
