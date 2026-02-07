@@ -292,9 +292,9 @@ if prompt := c2.chat_input(placeholder='Your message'):
         c1.chat_message('system', avatar=avatars['system']).write(f"File uploaded: {', '.join(new_names)}")
     attachments = build_attachment_payload(st.session_state.get("file_ids", []))
     if attachments:
-        c1.chat_message('system', avatar=avatars['system']).write(
-            f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
-        )
+        #c1.chat_message('system', avatar=avatars['system']).write(
+        #    f"Attach {len(attachments)} file(s) to the upcoming prompt: {[entry['file_id'] for entry in attachments]}"
+        #)
         logging.info("Preparing to send attachments %s with vector stores %s", [entry['file_id'] for entry in attachments], st.session_state.get("vector_store_ids"))
     tools = []
     if attachments:
@@ -315,7 +315,7 @@ if prompt := c2.chat_input(placeholder='Your message'):
         response = call_responses_api(client, prompt_payload, _build_response_input(st.session_state["messages"], user_input), tools)
         logging.info("Responses API result: %s", response)
         output_summary = _summarize_response_output(getattr(response, "output", []))
-        c1.chat_message('system', avatar=avatars['system']).write(
+        logging.debug(
             f"Response metadata: {output_summary}. Attachment items sent: {[entry['file_id'] for entry in attachments]}"
         )
         assistant_text = _extract_assistant_text(response) or ""
