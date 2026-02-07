@@ -3,10 +3,18 @@ import streamlit as st
 from io import BytesIO
 from streamlit_gsheets import GSheetsConnection
 import logging
+import sys
 import uuid
 from datetime import datetime
 from streamlit_extras.bottom_container import bottom
 from typing import Callable, Iterable
+
+if not logging.getLogger().handlers:
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    stdout_handler.setFormatter(formatter)
+    logging.getLogger().addHandler(stdout_handler)
+    logging.getLogger().setLevel(logging.INFO)
 
 def check_if_date_string_is_valid(date_string, check_valid_to=True):
     if not isinstance(date_string, str):
